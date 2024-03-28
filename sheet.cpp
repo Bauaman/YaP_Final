@@ -20,7 +20,9 @@ void Sheet::SetCell(Position pos, std::string text) {
     if (pos.col >= static_cast<int>(cells_[pos.row].size())) {
         cells_[pos.row].resize(pos.col + 1);
     }
-    cells_[pos.row][pos.col] = std::make_unique<Cell>(*this);
+    if (!cells_[pos.row][pos.col]) {
+        cells_[pos.row][pos.col] = std::make_unique<Cell>(*this);
+    }
     cells_[pos.row][pos.col] -> Set(std::move(text));
 }
 
@@ -88,11 +90,13 @@ const Cell* Sheet::GetConcreteCell(Position pos) const {
     if (!pos.IsValid()) {
         throw InvalidPositionException("Invalid position");
     }
-    std::cout << "GetConcrete cell (" << pos.row << "," << pos.col << ")" << std::endl; 
+    //std::cout << "GetConcrete cell (" << pos.row << "," << pos.col << ")" << std::endl; 
     if (pos.row < static_cast<int>(cells_.size()) && pos.col < static_cast<int>(cells_[pos.row].size())) {
+            /*if (cells_[pos.row][pos.col].get()->GetText() == "") {
+                return nullptr;
+            }*/
             return cells_[pos.row][pos.col].get();
     }
-    
     return nullptr;
 }
 

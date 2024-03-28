@@ -121,16 +121,30 @@ void TestSetCellPlainText() {
     ASSERT_EQUAL(std::get<std::string>(cell->GetValue()), "=escaped");
 }
 
+void TestReferencedCells() {
+    auto sheet = CreateSheet();
+    try {
+        sheet->SetCell("C1"_pos, "=123");
+        sheet->SetCell("A1"_pos, "=C1+A1");
+    } catch (const CircularDependencyException&) {
+    }
+    try {
+        sheet->SetCell("C1"_pos, "=123");
+        sheet->SetCell("A1"_pos, "=A1");
+    } catch (const CircularDependencyException&) {
+    }
+}
+
 void TestClearCell() {
     auto sheet = CreateSheet();
 
     sheet->SetCell("C2"_pos, "Me gusta");
-    std::cout << "printable size " << sheet->GetPrintableSize() << std::endl;
-    std::cout << "C2.text \"" << sheet->GetCell("C2"_pos)->GetText() << "\"" << std::endl;
+    //std::cout << "printable size " << sheet->GetPrintableSize() << std::endl;
+    //std::cout << "C2.text \"" << sheet->GetCell("C2"_pos)->GetText() << "\"" << std::endl;
     sheet->ClearCell("C2"_pos);
-    std::cout << "CLEAR" << std::endl;
-    std::cout << "printable size " << sheet->GetPrintableSize() << std::endl;
-    std::cout << "C2.text \"" << sheet->GetCell("C2"_pos)->GetText() << "\"" << std::endl;
+    //std::cout << "CLEAR" << std::endl;
+    //std::cout << "printable size " << sheet->GetPrintableSize() << std::endl;
+    //std::cout << "C2.text \"" << sheet->GetCell("C2"_pos)->GetText() << "\"" << std::endl;
     ASSERT(sheet->GetCell("C2"_pos) == nullptr);
 
     sheet->ClearCell("A1"_pos);
@@ -358,6 +372,7 @@ int main() {
     RUN_TEST(tr, TestPositionAndStringConversion);
     RUN_TEST(tr, TestPositionToStringInvalid);
     RUN_TEST(tr, TestStringToPositionInvalid);
+    RUN_TEST(tr, TestReferencedCells);
     RUN_TEST(tr, TestEmpty);
     RUN_TEST(tr, TestInvalidPosition);
     RUN_TEST(tr, TestSetCellPlainText);

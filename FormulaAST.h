@@ -3,7 +3,7 @@
 #include "FormulaLexer.h"
 #include "common.h"
 
-#include <list>
+#include <forward_list>
 #include <functional>
 #include <stdexcept>
 
@@ -17,20 +17,32 @@ class ParsingError : public std::runtime_error {
 
 class FormulaAST {
 public:
-    explicit FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr);
+    explicit FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr,
+                        std::forward_list<Position> cells);
     FormulaAST(FormulaAST&&) = default;
     FormulaAST& operator=(FormulaAST&&) = default;
     ~FormulaAST();
 
     double Execute(const std::function<double(Position)>& cell_pos_func) const;
+    void PrintCells(std::ostream& out) const;
     void Print(std::ostream& out) const;
     void PrintFormula(std::ostream& out) const;
-    std::list<Position>& GetCells();
-    const std::list<Position>& GetCells() const;
+
+    std::forward_list<Position>& GetCells() {
+        return cells_;
+    }
+
+    const std::forward_list<Position>& GetCells() const {
+        return cells_;
+    }
 
 private:
     std::unique_ptr<ASTImpl::Expr> root_expr_;
-    std::list<Position> cells_;
+
+    // physically stores cells so that they can be
+    // efficiently traversed without going through
+    // the whole AST
+    std::forward_list<Position> cells_;
 };
 
 FormulaAST ParseFormulaAST(std::istream& in);

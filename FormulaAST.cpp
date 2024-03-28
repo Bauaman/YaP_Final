@@ -67,16 +67,6 @@ constexpr PrecedenceRule PRECEDENCE_RULES[EP_END][EP_END] = {
     /* EP_ATOM */ {PR_NONE, PR_NONE, PR_NONE, PR_NONE, PR_NONE, PR_NONE},
 };
 
-/*
-            EP_ADD      EP_SUB      EP_MUL      EP_DIV      EP_UNARY    EP_ATOM
-EP_ADD      PR_NONE     PR_NONE     PR_NONE     PR_NONE     PR_NONE     PR_NONE
-EP_SUB      PR_RIGHT    PR_RIGHT    PR_NONE     PR_NONE     PR_NONE     PR_NONE
-EP_MUL      PR_BOTH     PR_BOTH     PR_NONE     PR_NONE     PR_NONE     PR_NONE
-EP_DIV      PR_BOTH     PR_BOTH     PR_RIGHT    PR_RIGHT    PR_NONE     PR_NONE
-EP_UNARY    PR_BOTH     PR_BOTH     PR_NONE     PR_NONE     PR_NONE     PR_NONE
-EP_ATOM     PR_NONE     PR_NONE     PR_NONE     PR_NONE     PR_NONE     PR_NONE
-*/
-
 class Expr {
 public:
     virtual ~Expr() = default;
@@ -152,8 +142,6 @@ public:
         }
     }
 
-// Реализуйте метод Evaluate() для бинарных операций.
-// При делении на 0 выбрасывайте ошибку вычисления FormulaError
     double Evaluate(const std::function<double(Position)>& args) const override {
         auto lhs_val = lhs_->Evaluate(args);
         auto rhs_val = rhs_->Evaluate(args);
@@ -217,9 +205,7 @@ public:
         return EP_UNARY;
     }
 
-// Реализуйте метод Evaluate() для унарных операций.
     double Evaluate(const std::function<double(Position)>& args) const override {
-
         switch (type_) {
         case UnaryMinus:
             return -1*operand_->Evaluate(args);
@@ -281,7 +267,6 @@ public:
         return EP_ATOM;
     }
 
-// Для чисел метод возвращает значение числа.
     double Evaluate(const std::function<double(Position)>& args) const override {
         return value_;
     }
@@ -298,6 +283,10 @@ public:
         args_.clear();
 
         return root;
+    }
+
+    std::forward_list<Position> MoveCells() {
+        return std::move(cells_);
     }
 
 public:
@@ -331,6 +320,18 @@ public:
         args_.push_back(std::move(node));
     }
 
+    void exitCell(FormulaParser::CellContext* ctx) override {
+        auto value_str = ctx->CELL()->getSymbol()->getText();
+        auto value = Position::FromString(value_str);
+        if (!value.IsValid()) {
+            throw FormulaException("Invalid position: " + value_str);
+        }
+
+        cells_.push_front(value);
+        auto node = std::make_unique<CellExpr>(&cells_.front());
+        args_.push_back(std::move(node));
+    }
+
     void exitBinaryOp(FormulaParser::BinaryOpContext* ctx) override {
         assert(args_.size() >= 2);
 
@@ -361,6 +362,7 @@ public:
 
 private:
     std::vector<std::unique_ptr<Expr>> args_;
+    std::forward_list<Position> cells_;
 };
 
 class BailErrorListener : public antlr4::BaseErrorListener {
@@ -397,15 +399,17 @@ FormulaAST ParseFormulaAST(std::istream& in) {
     ASTImpl::ParseASTListener listener;
     tree::ParseTreeWalker::DEFAULT.walk(&listener, tree);
 
-    return FormulaAST(listener.MoveRoot());
+    return FormulaAST(listener.MoveRoot(), listener.MoveCells());
 }
 
 FormulaAST ParseFormulaAST(const std::string& in_str) {
     std::istringstream in(in_str);
-    try {
-        return ParseFormulaAST(in);
-    } catch (const std::exception& exc) {
-        std::throw_with_nested(FormulaException(exc.what()));
+    return ParseFormulaAST(in);
+}
+
+void FormulaAST::PrintCells(std::ostream& out) const {
+    for (auto cell : cells_) {
+        out << cell.ToString() << ' ';
     }
 }
 
@@ -421,16 +425,10 @@ double FormulaAST::Execute(const std::function<double(Position)>& cell_pos_func)
     return root_expr_->Evaluate(cell_pos_func);
 }
 
-FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr)
-    : root_expr_(std::move(root_expr)) {
-}
-
-std::list<Position>& FormulaAST::GetCells() {
-    return cells_;
-}
-
-const std::list<Position>& FormulaAST::GetCells() const {
-    return cells_;
+FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells)
+    : root_expr_(std::move(root_expr))
+    , cells_(std::move(cells)) {
+    cells_.sort();  // to avoid sorting in GetReferencedCells
 }
 
 FormulaAST::~FormulaAST() = default;

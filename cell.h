@@ -70,7 +70,7 @@ private:
 
     class FormulaImpl : public Impl {
     public:
-        explicit FormulaImpl(std::string_view text, SheetInterface& sheet);
+        explicit FormulaImpl(std::string text, SheetInterface& sheet);
         Value GetValue() const override;
         std::string GetText() const override;
         std::vector<Position> GetReferencedCells() const override;
